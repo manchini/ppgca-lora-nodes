@@ -8,16 +8,17 @@
 
 #define CFG_us915 1
 
-static const u1_t PROGMEM APPEUI[8]={  };   // Chose LSB mode on the console and then copy it here.
+static const PROGMEM u1_t NWKSKEY[16] = {  };
 
-void os_getArtEui (u1_t* buf) { memcpy_P(buf, APPEUI, 8);}
+static const u1_t PROGMEM APPSKEY[16] = { };
+
+// LoRaWAN end-device address (DevAddr)
+static const u4_t DEVADDR = 0X1 ; //  ; // <-- Change this address for every node!
 
 
-static const u1_t PROGMEM DEVEUI[8]= {  };   // LSB mode
-void os_getDevEui (u1_t* buf) { memcpy_P(buf, DEVEUI, 8);}
-
-static const u1_t PROGMEM APPKEY[16] = { }; // MSB mode
-void os_getDevKey (u1_t* buf) { memcpy_P(buf, APPKEY, 16);}
+void os_getArtEui (u1_t* buf) { }
+void os_getDevEui (u1_t* buf) { }
+void os_getDevKey (u1_t* buf) { }
 
 
 const lmic_pinmap lmic_pins = {
@@ -30,7 +31,7 @@ const lmic_pinmap lmic_pins = {
 static osjob_t sendjob;
 char TTN_response[30];
 
-const unsigned TX_INTERVAL = 7;
+const unsigned TX_INTERVAL = 3;
 
 uint32_t LatitudeBinary, LongitudeBinary;
 uint16_t altitudeGps;
@@ -82,6 +83,9 @@ boolean getGPS()
           //se não chegou até o 9 é porque tem erro
           if(i<9){
             Serial.println("Fail GPS");
+            digitalWrite(12, HIGH);
+            delay(1000);
+            digitalWrite(12, LOW);
             return false;
           }
 
@@ -130,20 +134,32 @@ boolean getGPS()
     }
   }
   Serial.println("#");
+  digitalWrite(12, HIGH);
+  delay(1000);
+  digitalWrite(12, LOW);
   return false;
 }
 
 void do_send(osjob_t* j) {
 
-  getGPS();
-    // Check if there is not a current TX/RX job running
-    if (LMIC.opmode & OP_TXRXPEND) {
-      Serial.println(F("OP_TXRXPEND, not sending"));
-    } else {
-      //LMIC_setTxData2(1, buffer, sizeof(buffer)/sizeof(buffer[0]), 0);
-      LMIC_setTxData2(1, txBuffer, sizeof(txBuffer)/sizeof(txBuffer[0]), 0);
-      //  Serial.println("Sending");
-    }
+  if(!getGPS()){
+    txBuffer[0] = 0;
+    txBuffer[1] = 0;
+    txBuffer[2] =0;
+    txBuffer[3] = 0;
+    txBuffer[4] = 0;
+    txBuffer[5] = 0;
+    txBuffer[6] = 0;
+    txBuffer[7  ] = 0;
+  }
+  // Check if there is not a current TX/RX job running
+  if (LMIC.opmode & OP_TXRXPEND) {
+    Serial.println(F("OP_TXRXPEND, not sending"));
+  } else {
+    //LMIC_setTxData2(1, buffer, sizeof(buffer)/sizeof(buffer[0]), 0);
+    LMIC_setTxData2(1, txBuffer, sizeof(txBuffer)/sizeof(txBuffer[0]), 0);
+    //  Serial.println("Sending");
+  }
   //}
 }
 
@@ -163,6 +179,10 @@ void onEvent (ev_t ev) {
       TTN_response[i] = 0;
       Serial.println(TTN_response);
     }
+
+    digitalWrite(13, HIGH);
+    delay(1000);
+    digitalWrite(13, LOW);
 
     // Schedule next transmission
     os_setTimedCallback(&sendjob, os_getTime()+sec2osticks(TX_INTERVAL), do_send);
@@ -225,6 +245,9 @@ void onEvent (ev_t ev) {
 
 void setup() {
 
+  pinMode(13, OUTPUT);
+  pinMode(12, OUTPUT);
+
   LMIC.freq = 904300000;
   Serial.begin(9600);
   Serial.println("Started");
@@ -233,16 +256,30 @@ void setup() {
   LMIC_reset();
   LMIC_setClockError(MAX_CLOCK_ERROR * 1 / 100);
 
+  #ifdef PROGMEM
+  // On AVR, these values are stored in flash and only copied to RAM
+  // once. Copy them to a temporary buffer here, LMIC_setSession will
+  // copy them into a buffer of its own again.
+  uint8_t appskey[sizeof(APPSKEY)];
+  uint8_t nwkskey[sizeof(NWKSKEY)];
+  memcpy_P(appskey, APPSKEY, sizeof(APPSKEY));
+  memcpy_P(nwkskey, NWKSKEY, sizeof(NWKSKEY));
+  LMIC_setSession (0x1, DEVADDR, nwkskey, appskey);
+  #else
+  // If not running an AVR with PROGMEM, just use the arrays directly
+  LMIC_setSession (0x1, DEVADDR, NWKSKEY, APPSKEY);
+  #endif
+
 
   LMIC_setLinkCheckMode(0);
   //LMIC_setAdrMode(1);
   //LMIC.dn2Dr = DR_SF9;
-  //LMIC_setDrTxpow(DR_SF9,14);
+  LMIC_setDrTxpow(DR_SF10,14);
   LMIC_startJoining();
   do_send(&sendjob);
 
   LMIC.dn2Dr = DR_SF9;
-  LMIC_setDrTxpow(DR_SF9,14);
+  LMIC_setDrTxpow(DR_SF10,14);
 }
 
 

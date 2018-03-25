@@ -3,18 +3,21 @@
 #include "lmic.h"
 #include "hal/hal.h"
 #include <SPI.h>
+#include "DHT.h"
 
+
+#define debug 1;
 #define CFG_us915 1
 
-static const u1_t PROGMEM APPEUI[8]={ };   // Chose LSB mode on the console and then copy it here.
+static const u1_t PROGMEM APPEUI[8]={  };   // Chose LSB mode on the console and then copy it here.
 
 void os_getArtEui (u1_t* buf) { memcpy_P(buf, APPEUI, 8);}
 
 
-static const u1_t PROGMEM DEVEUI[8]={ };   // LSB mode
+static const u1_t PROGMEM DEVEUI[8]={  };   // LSB mode
 void os_getDevEui (u1_t* buf) { memcpy_P(buf, DEVEUI, 8);}
 
-static const u1_t PROGMEM APPKEY[16] = {}; // MSB mode
+static const u1_t PROGMEM APPKEY[16] = {  }; // MSB mode
 void os_getDevKey (u1_t* buf) { memcpy_P(buf, APPKEY, 16);}
 
 
@@ -26,25 +29,62 @@ const lmic_pinmap lmic_pins = {
 };
 
 static osjob_t sendjob;
-char TTN_response[30];
-#define DIGITAL_IN 0
+byte buffer[8];
+byte TTN_response[3];
+const unsigned TX_INTERVAL = 60;
 
+#define DHTPIN 5
+#define DHTTYPE DHT22
+DHT dht(DHTPIN, DHTTYPE);
+float temp;
+float hum;
 
-const unsigned TX_INTERVAL = 7;
+// mq7
+const int mq7pin=0;//the AOUT pin of the CO sensor goes into analog pin A0 of the arduino
+int mq7Value;
+
+const int mpxPin=1;
+int mpxValue;
+float mpxAverage = 0;
+bool car = 1;
+int countTraffic=0;
+
+///
+
+unsigned long lastUplinkMillis = 0;
+unsigned long currentMillis = 0;
 
 
 void do_send(osjob_t* j) {
 
-  byte buffer[1];
-  buffer[0] = 6;
+  temp = dht.readTemperature();
+  hum = dht.readHumidity();
+
+  mq7Value= analogRead(mq7pin);
+
+  Serial.print(countTraffic);
+  Serial.print(";");
+  Serial.print( (int) (temp*100));
+  Serial.print(";");
+  Serial.print((int) (hum *10));
+  Serial.print(";");
+  Serial.println(mq7Value);
+
+  //buffer
+  buffer[0] = (countTraffic & 0xFF00) >> 8;
+  buffer[1] = (countTraffic & 0x00FF);
+  buffer[2] = (((int) (temp*100))& 0xFF00) >> 8;
+  buffer[3] =  (((int) (temp*100))& 0x00FF);
+  buffer[4] = (((int) (hum*10))& 0xFF00) >> 8;
+  buffer[5] =  (((int) (hum*100))& 0x00FF);
+  buffer[6] = (((int) (mq7Value*10))& 0xFF00) >> 8;
+  buffer[7] =  (((int) (mq7Value*100))& 0x00FF);
 
   // Check if there is not a current TX/RX job running
   if (LMIC.opmode & OP_TXRXPEND) {
     Serial.println(F("OP_TXRXPEND, not sending"));
   } else {
-    //LMIC_setTxData2(1, buffer, sizeof(buffer)/sizeof(buffer[0]), 0);
     LMIC_setTxData2(1, buffer, sizeof(buffer)/sizeof(buffer[0]), 0);
-    //  Serial.println("Sending");
   }
 }
 
@@ -57,12 +97,19 @@ void onEvent (ev_t ev) {
     }
 
     if (LMIC.dataLen) {
-      int i = 0;
-      for ( i = 0 ; i < LMIC.dataLen ; i++ ){
-        TTN_response[i] = LMIC.frame[LMIC.dataBeg+i];
+      for (int i = 0; i < LMIC.dataLen; i++) {
+        TTN_response[i] = LMIC.frame[LMIC.dataBeg + i];
       }
-      TTN_response[i] = 0;
-      Serial.println(TTN_response);
+
+      if(TTN_response[0]){// retorno OK
+        int retorno = (TTN_response[1] << 8)
+        + TTN_response[2];
+
+        countTraffic = countTraffic - retorno;
+        if(countTraffic<0){
+          countTraffic = 0;
+        }
+      }
     }
 
     // Schedule next transmission
@@ -126,27 +173,48 @@ void onEvent (ev_t ev) {
 
 void setup() {
 
-  //LMIC.freq = 915000000;
-  Serial.begin(9600);
-  Serial.println(F("Starting..."));
+
+  Serial.begin(115200);
+  Serial.println(F("Starting"));
+  dht.begin();
 
   os_init();
   LMIC_reset();
-  LMIC_setClockError(MAX_CLOCK_ERROR * 1 / 100);
 
-
+  LMIC.freq = 904300000;
   LMIC_setLinkCheckMode(0);
   //LMIC_setAdrMode(1);
   //LMIC.dn2Dr = DR_SF9;
   //LMIC_setDrTxpow(DR_SF9,14);
-
+  //LMIC_startJoining();
   do_send(&sendjob);
-
   LMIC.dn2Dr = DR_SF9;
   LMIC_setDrTxpow(DR_SF9,14);
+
 
 }
 
 void loop() {
   os_runloop_once();
+
+  mpxValue = analogRead(mpxPin);
+  //Serial.println(mpxValue);
+  unsigned long currentMillis = millis();
+
+  if(currentMillis<5000){ // avg pressao
+    mpxAverage +=((float)mpxValue-mpxAverage)/10.f;
+  }else{
+    if(mpxValue>mpxAverage +5){
+      car = !car;
+      if(car){
+        countTraffic++;
+        Serial.print("#");
+        Serial.println(countTraffic);
+      }
+      mpxAverage =mpxValue+10;
+
+    }else{
+      mpxAverage +=((float)mpxValue-mpxAverage)/100.f;
+    }
+  }
 }

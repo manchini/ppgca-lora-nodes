@@ -26,17 +26,17 @@ static const u1_t PROGMEM APPEUI[8]={ };   // Chose LSB mode on the console and 
 void os_getArtEui (u1_t* buf) { memcpy_P(buf, APPEUI, 8);}
 
 
-static const u1_t PROGMEM DEVEUI[8]= {  };   // LSB mode
+static const u1_t PROGMEM DEVEUI[8]= { };   // LSB mode
 void os_getDevEui (u1_t* buf) { memcpy_P(buf, DEVEUI, 8);}
 
-static const u1_t PROGMEM APPKEY[16] = {  }; // MSB mode
+static const u1_t PROGMEM APPKEY[16] = { }; // MSB mode
 void os_getDevKey (u1_t* buf) { memcpy_P(buf, APPKEY, 16);}
 
 
 
 static osjob_t sendjob;
 char TTN_response[30];
-const unsigned TX_INTERVAL = 600;
+const unsigned TX_INTERVAL = 5;
 
 #define DHTPIN 8
 #define DHTTYPE DHT22
@@ -210,7 +210,7 @@ void setup() {
   //LMIC_setAdrMode(1);
   //LMIC.dn2Dr = DR_SF9;
   //LMIC_setDrTxpow(DR_SF9,14);
-  LMIC_startJoining();
+  //LMIC_startJoining();
   do_send(&sendjob);
 
   LMIC.dn2Dr = DR_SF9;
