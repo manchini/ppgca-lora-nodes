@@ -4,20 +4,17 @@
 #include "hal/hal.h"
 #include <SPI.h>
 #include "DHT.h"
-
+#include "config.h"
 
 #define debug 1;
 #define CFG_us915 1
 
-static const u1_t PROGMEM APPEUI[8]={  };   // Chose LSB mode on the console and then copy it here.
 
 void os_getArtEui (u1_t* buf) { memcpy_P(buf, APPEUI, 8);}
 
 
-static const u1_t PROGMEM DEVEUI[8]={  };   // LSB mode
 void os_getDevEui (u1_t* buf) { memcpy_P(buf, DEVEUI, 8);}
 
-static const u1_t PROGMEM APPKEY[16] = {  }; // MSB mode
 void os_getDevKey (u1_t* buf) { memcpy_P(buf, APPKEY, 16);}
 
 

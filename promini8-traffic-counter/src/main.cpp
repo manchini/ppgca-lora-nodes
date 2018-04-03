@@ -38,19 +38,23 @@ float temp;
 float hum;
 
 // mq7
-const int mq7pin=0;//the AOUT pin of the CO sensor goes into analog pin A0 of the arduino
-int mq7Value;
+#define mq7pin 0//the AOUT pin of the CO sensor goes into analog pin A0 of the arduino
+unsigned int mq7Value;
 
-const int mpxPin=1;
-int mpxValue;
+#define mpxPin 1
+unsigned long  mpxValue;
 float mpxAverage = 0;
 bool car = 1;
-int countTraffic=0;
+unsigned int countTraffic=0;
 
 ///
 
+
 unsigned long lastUplinkMillis = 0;
 unsigned long currentMillis = 0;
+
+/*#define ledMsgPin  10*/
+#define ledCountPin  9
 
 
 void do_send(osjob_t* j) {
@@ -87,7 +91,7 @@ void do_send(osjob_t* j) {
 }
 
 void onEvent (ev_t ev) {
-Serial.println(LMIC.freq);
+  //Comunicaçcao
 
   switch(ev) {
     case EV_TXCOMPLETE:
@@ -111,7 +115,10 @@ Serial.println(LMIC.freq);
         }
       }
     }
-
+    /*digitalWrite(ledMsgPin, HIGH);
+    delay(100);
+    digitalWrite(ledMsgPin, LOW);
+*/
     // Schedule next transmission
     os_setTimedCallback(&sendjob, os_getTime()+sec2osticks(TX_INTERVAL), do_send);
 
@@ -130,6 +137,7 @@ Serial.println(LMIC.freq);
     break;
     case EV_JOINING:
     Serial.println(F("EV_JOINING"));
+
     break;
     case EV_JOINED:
     Serial.println(F("EV_JOINED"));
@@ -137,6 +145,9 @@ Serial.println(LMIC.freq);
     // Disable link check validation (automatically enabled
     // during join, but not supported by TTN at this time).
     LMIC_setLinkCheckMode(0);
+  /*  digitalWrite(ledMsgPin, HIGH);
+    delay(100);
+    digitalWrite(ledMsgPin, LOW);*/
     break;
     case EV_RFU1:
     Serial.println(F("EV_RFU1"));
@@ -176,6 +187,9 @@ void setup() {
 
   Serial.begin(115200);
   Serial.println(F("Starting"));
+  /*pinMode(ledMsgPin, OUTPUT);*/
+  pinMode(ledCountPin, OUTPUT);
+
   dht.begin();
 
   os_init();
@@ -196,25 +210,41 @@ void setup() {
 
 void loop() {
   os_runloop_once();
-
-  mpxValue = analogRead(mpxPin);
-  //Serial.println(mpxValue);
-  unsigned long currentMillis = millis();
+  currentMillis = millis();
 
   if(currentMillis<5000){ // avg pressao
     mpxAverage +=((float)mpxValue-mpxAverage)/10.f;
   }else{
-    if(mpxValue>mpxAverage +5){
+    mpxValue = 0;
+    for(int i = 0; i <20;i++){
+      mpxValue += analogRead(mpxPin);
+      //delay(1);
+    }
+    mpxValue = mpxValue/20;
+
+    if(mpxValue>mpxAverage +3// ){
+
+    && ((mpxValue-(int)mpxAverage)< 7 || (mpxValue-(int)mpxAverage)> 8 )){//gamb de noiser
       car = !car;
       if(car){
         countTraffic++;
         Serial.print("#");
         Serial.println(countTraffic);
+        Serial.print(";");
+        Serial.print(mpxAverage);
+        Serial.print(";");
+        Serial.println(mpxValue);
+        digitalWrite(ledCountPin, HIGH);
+        delay(100);
+        digitalWrite(ledCountPin, LOW);
       }
-      mpxAverage =mpxValue+10;
+      mpxAverage =mpxValue+3;
 
     }else{
-      mpxAverage +=((float)mpxValue-mpxAverage)/100.f;
+      mpxAverage +=((float)mpxValue-mpxAverage)/10.f;
+      /*Serial.print(mpxAverage);
+      Serial.print(";");
+      Serial.println(mpxValue);*/
     }
   }
 }
