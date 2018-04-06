@@ -26,3 +26,9 @@
 *.exe
 *.out
 *.app
+
+promini8-traffic-counter/src/config\.h
+
+ttn-mapper/src/config\.h
+
+uno-traffic-counter/src/config\.h

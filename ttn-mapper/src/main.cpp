@@ -6,14 +6,10 @@
 #include <SPI.h>
 #include <string.h>
 
+#include "config.h"
+
 #define CFG_us915 1
 
-static const PROGMEM u1_t NWKSKEY[16] = {  };
-
-static const u1_t PROGMEM APPSKEY[16] = { };
-
-// LoRaWAN end-device address (DevAddr)
-static const u4_t DEVADDR = 0X1 ; //  ; // <-- Change this address for every node!
 
 
 void os_getArtEui (u1_t* buf) { }
@@ -91,11 +87,13 @@ boolean getGPS()
 
           //Monta buffer de envio
           float flat = atof(tmpLat)/100;
+          flat = flat +0.153268;
           if(tmpSN=='S'){
             flat = flat*-1;
           }
 
           float flon = atof(tmpEWn)/100;
+          flon = flon +0.366481;
           if(tmpEW=='W'){
             flon = flon*-1;
           }
