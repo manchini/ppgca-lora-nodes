@@ -1,48 +1,34 @@
-#if defined(__AVR__)
-#include <avr/pgmspace.h>
 #include <Arduino.h>
-#elif defined(ARDUINO_ARCH_ESP8266)
-#include <ESP.h>
-#elif defined(__MKL26Z64__)
-#include <Arduino.h>
-#else
-#error Unknown architecture in aes.cpp
-#endif
 
 #include "lmic.h"
 #include "hal/hal.h"
 #include <SPI.h>
 #include "DHT.h"
+#include "config.h"
 
-////////////////////////////
+//#include <hcsr04.h>
 
-
-
+#define debug 1;
 #define CFG_us915 1
 
 
-static const u1_t PROGMEM APPEUI[8]={ };   // Chose LSB mode on the console and then copy it here.
-
 void os_getArtEui (u1_t* buf) { memcpy_P(buf, APPEUI, 8);}
 
-
-static const u1_t PROGMEM DEVEUI[8]= { };   // LSB mode
 void os_getDevEui (u1_t* buf) { memcpy_P(buf, DEVEUI, 8);}
 
-static const u1_t PROGMEM APPKEY[16] = { }; // MSB mode
 void os_getDevKey (u1_t* buf) { memcpy_P(buf, APPKEY, 16);}
 
 
 
 static osjob_t sendjob;
 char TTN_response[30];
-const unsigned TX_INTERVAL = 5;
+const unsigned TX_INTERVAL = 60;
 
-#define DHTPIN 8
+#define DHTPIN 7
 #define DHTTYPE DHT22
+
 #define LPP_TEMPERATURE 103
 #define LPP_HUMIDITY 104
-#define DIGITAL_IN 0
 
 int counter = 0;
 
@@ -60,33 +46,20 @@ void do_send(osjob_t* j) {
 
   int16_t val;
 
-  byte buffer[10];
+  byte buffer[7];
   uint8_t cursor = 0;
 
-  float temperature = 0;//dht.readTemperature();
-  //delay(2000);
-  //while(temperature==0 || isnan(temperature)){
+  float temperature = 0;
   if(temperature==0 || isnan(temperature)){
     delay(2000);
     temperature = dht.readTemperature();
   }
 
-  Serial.print("Temp:");
-  Serial.println(temperature);
-
-
-  float humidity = 0;//dht.readHumidity();
-
-  //  while(humidity==0 || isnan(humidity)){
+  float humidity = 0;
   if(humidity==0 || isnan(humidity)){
     delay(2000);
     humidity = dht.readHumidity();
   }
-
-  Serial.print("hum:");
-  Serial.println(humidity);
-
-
   //Monta Mensagem
 
   val = float(temperature*10);
@@ -102,10 +75,6 @@ void do_send(osjob_t* j) {
   buffer[cursor++] = LPP_HUMIDITY;
   buffer[cursor++] = val;
 
-  val = counter++;
-  buffer[cursor++] = 0x03;
-  buffer[cursor++] = DIGITAL_IN;
-  buffer[cursor++] = val;
 
   // Check if there is not a current TX/RX job running
   if (LMIC.opmode & OP_TXRXPEND) {
@@ -197,7 +166,7 @@ void onEvent (ev_t ev) {
 
 void setup() {
 
-  Serial.begin(9600);
+  Serial.begin(115200);
   Serial.println(F("Starting"));
 
 
@@ -216,10 +185,20 @@ void setup() {
   LMIC.dn2Dr = DR_SF9;
   LMIC_setDrTxpow(DR_SF9,14);
 }
+/*
+#define TRIG_PIN 9
+#define ECHO_PIN 8
 
+HCSR04 hcsr04(TRIG_PIN, ECHO_PIN, 20, 4000);*/
 
 void loop() {
 
   os_runloop_once();
+
+  /*Serial.println(hcsr04.ToString());
+
+   delay(250);*/
+
+
 
 }

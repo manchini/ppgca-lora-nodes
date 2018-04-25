@@ -29,7 +29,7 @@ const lmic_pinmap lmic_pins = {
   static osjob_t sendjob;
   byte buffer[8];
   byte TTN_response[3];
-  #define TX_INTERVAL  30
+  #define TX_INTERVAL  60
   bool radioON = false;
 
   #define DHTPIN 3
