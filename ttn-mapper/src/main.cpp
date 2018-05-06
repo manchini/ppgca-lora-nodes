@@ -27,7 +27,7 @@ const lmic_pinmap lmic_pins = {
 static osjob_t sendjob;
 char TTN_response[30];
 
-const unsigned TX_INTERVAL = 3;
+const unsigned TX_INTERVAL = 30;
 
 uint32_t LatitudeBinary, LongitudeBinary;
 uint16_t altitudeGps;
@@ -250,7 +250,7 @@ void setup() {
   Serial.begin(9600);
   Serial.println("Started");
 
-  os_init();
+/*  os_init();
   LMIC_reset();
   LMIC_setClockError(MAX_CLOCK_ERROR * 1 / 100);
 
@@ -277,12 +277,15 @@ void setup() {
   do_send(&sendjob);
 
   LMIC.dn2Dr = DR_SF9;
-  LMIC_setDrTxpow(DR_SF10,14);
+  LMIC_setDrTxpow(DR_SF10,14);*/
 }
 
 
 void loop()
 {
-  os_runloop_once();
+//  os_runloop_once();
+
+getGPS();
+delay(5000);
 
 }

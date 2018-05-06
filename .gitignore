@@ -34,3 +34,5 @@ ttn-mapper/src/config\.h
 uno-traffic-counter/src/config\.h
 
 promini8-dht22/src/config\.h
+
+uno-dht22/src/config\.h

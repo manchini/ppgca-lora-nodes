@@ -6,9 +6,8 @@
 #include "DHT.h"
 #include "config.h"
 
-//#include <hcsr04.h>
 
-#define debug 0;
+#define debug 1;
 #define CFG_us915 1
 
 
@@ -19,13 +18,11 @@ void os_getDevEui (u1_t* buf) { memcpy_P(buf, DEVEUI, 8);}
 void os_getDevKey (u1_t* buf) { memcpy_P(buf, APPKEY, 16);}
 
 
-
 static osjob_t sendjob;
 char TTN_response[30];
-const unsigned TX_INTERVAL = 3600;
+ const unsigned TX_INTERVAL = 3600;
 
-#define DHTPIN 7
-#define DHTPINON 9
+#define DHTPIN 8
 #define DHTTYPE DHT22
 
 #define analogInPin  A0
@@ -39,14 +36,13 @@ float denominator;
 #define LPP_HUMIDITY 104
 #define LPP_ANALOG_INPUT 2
 
-float temperature = 0;
-float humidity = 0;
+
 
 const lmic_pinmap lmic_pins = {
-  .nss = 6,
+  .nss = 10,
   .rxtx = LMIC_UNUSED_PIN,
-  .rst = 5,
-  .dio = {2, 3, 4},
+  .rst = 9,
+  .dio = {2, 6, 7},
 };
 
 DHT dht(DHTPIN, DHTTYPE);
@@ -59,29 +55,30 @@ void do_send(osjob_t* j) {
   byte buffer[11];
   uint8_t cursor = 0;
 
-  //Liga pino do dht22
-  digitalWrite(DHTPINON, HIGH);
-  delay(2000);
-  temperature = dht.readTemperature();
+  float temperature = 0;
+  if(temperature==0 || isnan(temperature)){
+    delay(2000);
+    temperature = dht.readTemperature();
+  }
 
-  delay(2000);
-  humidity = dht.readHumidity();
-
-  digitalWrite(DHTPINON, LOW);
+  float humidity = 0;
+  if(humidity==0 || isnan(humidity)){
+    delay(2000);
+    humidity = dht.readHumidity();
+  }
 
   // read the analog in value:
 
   denominator = (float)resistor2 / (resistor1 + resistor2);
 
-
   sensorValue = 0;
-  for(int i = 0; i <50;i++){
+  for(int i = 0; i <500;i++){
     sensorValue += analogRead(analogInPin);
     delay(1);
   }
-  sensorValue = sensorValue/50;
+  sensorValue = sensorValue/500;
 
-  float voltage = sensorValue* 3.3 / 1023  ;
+  float voltage = sensorValue* 5.0  / 1023  ;
   voltage = voltage / denominator;
   Serial.println(voltage);
 
@@ -201,7 +198,6 @@ void setup() {
   Serial.begin(115200);
   Serial.println(F("Starting"));
 
-  pinMode(DHTPINON, OUTPUT);
 
   os_init();
   LMIC_reset();
@@ -218,7 +214,6 @@ void setup() {
   LMIC_selectSubBand(0);
 
   LMIC_setLinkCheckMode(0);
-
   LMIC_setDrTxpow(DR_SF9,14);
 
   do_send(&sendjob);
@@ -228,7 +223,6 @@ void setup() {
 
 
 void loop() {
-
   os_runloop_once();
 
 
