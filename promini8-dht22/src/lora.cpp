@@ -21,8 +21,9 @@ void os_getDevKey (u1_t* buf) { memcpy_P(buf, APPKEY, 16);}
 
 
 static osjob_t sendjob;
-char TTN_response[30];
-const unsigned TX_INTERVAL = 3600;
+char TTN_response[3];
+
+#define TX_INTERVAL  3600
 
 #define DHTPIN 7
 #define DHTPINON 9
@@ -31,6 +32,7 @@ const unsigned TX_INTERVAL = 3600;
 #define analogInPin  A0
 #define resistor1  1008
 #define resistor2  302
+float voltage = 0;
 
 long sensorValue = 0;
 float denominator;
@@ -42,6 +44,10 @@ float denominator;
 float temperature = 0;
 float humidity = 0;
 
+int16_t val;
+uint8_t cursor = 0;
+byte buffer[11];
+
 const lmic_pinmap lmic_pins = {
   .nss = 6,
   .rxtx = LMIC_UNUSED_PIN,
@@ -52,12 +58,31 @@ const lmic_pinmap lmic_pins = {
 DHT dht(DHTPIN, DHTTYPE);
 
 
+void resetLora(){
+  LMIC_reset();
+
+
+  uint8_t appskey[sizeof(APPSKEY)];
+  uint8_t nwkskey[sizeof(NWKSKEY)];
+  memcpy_P(appskey, APPSKEY, sizeof(APPSKEY));
+  memcpy_P(nwkskey, NWKSKEY, sizeof(NWKSKEY));
+  LMIC_setSession (0x1, DEVADDR, nwkskey, appskey);
+
+
+  LMIC_selectSubBand(0);
+
+  LMIC_setLinkCheckMode(0);
+
+  LMIC_setDrTxpow(DR_SF9,14);
+
+}
+
 void do_send(osjob_t* j) {
 
-  int16_t val;
+  resetLora();
 
-  byte buffer[11];
-  uint8_t cursor = 0;
+  val = 0;
+  cursor = 0;
 
   //Liga pino do dht22
   digitalWrite(DHTPINON, HIGH);
@@ -71,9 +96,6 @@ void do_send(osjob_t* j) {
 
   // read the analog in value:
 
-  denominator = (float)resistor2 / (resistor1 + resistor2);
-
-
   sensorValue = 0;
   for(int i = 0; i <50;i++){
     sensorValue += analogRead(analogInPin);
@@ -81,10 +103,9 @@ void do_send(osjob_t* j) {
   }
   sensorValue = sensorValue/50;
 
-  float voltage = sensorValue* 3.3 / 1023  ;
+  voltage = sensorValue * 3.3 / 1023  ;
   voltage = voltage / denominator;
   Serial.println(voltage);
-
 
   //Monta Mensagem
 
@@ -122,20 +143,19 @@ void do_send(osjob_t* j) {
 }
 
 void onEvent (ev_t ev) {
+  //Comunicaçcao
   switch(ev) {
     case EV_TXCOMPLETE:
     Serial.println(F("EV_TXCOMPLETE (includes waiting for RX windows)"));
     if (LMIC.txrxFlags & TXRX_ACK) {
       Serial.println(F("Received ack"));
     }
-
+    Serial.print("dataLen: ");
+    Serial.println(LMIC.dataLen);
     if (LMIC.dataLen) {
-      int i = 0;
-      for ( i = 0 ; i < LMIC.dataLen ; i++ ){
-        TTN_response[i] = LMIC.frame[LMIC.dataBeg+i];
+      for (int i = 0; i < LMIC.dataLen; i++) {
+        TTN_response[i] = LMIC.frame[LMIC.dataBeg + i];
       }
-      TTN_response[i] = 0;
-      Serial.println(TTN_response);
     }
 
     // Schedule next transmission
@@ -156,6 +176,7 @@ void onEvent (ev_t ev) {
     break;
     case EV_JOINING:
     Serial.println(F("EV_JOINING"));
+
     break;
     case EV_JOINED:
     Serial.println(F("EV_JOINED"));
@@ -163,6 +184,7 @@ void onEvent (ev_t ev) {
     // Disable link check validation (automatically enabled
     // during join, but not supported by TTN at this time).
     LMIC_setLinkCheckMode(0);
+
     break;
     case EV_RFU1:
     Serial.println(F("EV_RFU1"));
@@ -196,6 +218,8 @@ void onEvent (ev_t ev) {
 
 }
 
+
+
 void setup() {
 
   Serial.begin(115200);
@@ -203,33 +227,17 @@ void setup() {
 
   pinMode(DHTPINON, OUTPUT);
 
+  denominator = (float)resistor2 / (resistor1 + resistor2);
+
   os_init();
-  LMIC_reset();
-  LMIC_setClockError(MAX_CLOCK_ERROR * 1 / 100);
 
-
-  uint8_t appskey[sizeof(APPSKEY)];
-  uint8_t nwkskey[sizeof(NWKSKEY)];
-  memcpy_P(appskey, APPSKEY, sizeof(APPSKEY));
-  memcpy_P(nwkskey, NWKSKEY, sizeof(NWKSKEY));
-  LMIC_setSession (0x1, DEVADDR, nwkskey, appskey);
-
-
-  LMIC_selectSubBand(0);
-
-  LMIC_setLinkCheckMode(0);
-
-  LMIC_setDrTxpow(DR_SF9,14);
+  resetLora();
 
   do_send(&sendjob);
 
-
 }
 
-
 void loop() {
-
   os_runloop_once();
-
 
 }
