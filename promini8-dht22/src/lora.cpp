@@ -4,6 +4,7 @@
 #include "hal/hal.h"
 #include <SPI.h>
 #include "DHT.h"
+#include "LowPower.h"
 #include "config.h"
 
 //#include <hcsr04.h>
@@ -23,7 +24,7 @@ void os_getDevKey (u1_t* buf) { memcpy_P(buf, APPKEY, 16);}
 static osjob_t sendjob;
 char TTN_response[3];
 
-#define TX_INTERVAL  3600
+//#define TX_INTERVAL  3600
 
 #define DHTPIN 7
 #define DHTPINON 9
@@ -159,7 +160,13 @@ void onEvent (ev_t ev) {
     }
 
     // Schedule next transmission
-    os_setTimedCallback(&sendjob, os_getTime()+sec2osticks(TX_INTERVAL), do_send);
+    //os_setTimedCallback(&sendjob, os_getTime()+sec2osticks(TX_INTERVAL), do_send);
+
+    for (int i=0; i<420; i++) {
+      LowPower.powerDown(SLEEP_8S, ADC_OFF, BOD_OFF);
+    }
+    do_send(&sendjob);
+
 
     break;
     case EV_SCAN_TIMEOUT:
@@ -226,6 +233,8 @@ void setup() {
   Serial.println(F("Starting"));
 
   pinMode(DHTPINON, OUTPUT);
+  digitalWrite(DHTPINON, HIGH);
+  dht.begin();
 
   denominator = (float)resistor2 / (resistor1 + resistor2);
 
