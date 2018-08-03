@@ -20,10 +20,11 @@ void os_getDevKey (u1_t* buf) { memcpy_P(buf, APPKEY, 16);}
 
 static osjob_t sendjob;
 char TTN_response[30];
- const unsigned TX_INTERVAL = 3600;
+const unsigned TX_INTERVAL = 3600;
 
-#define DHTPIN 8
-#define DHTTYPE DHT22
+#define DHTPIN 5
+#define DHTTYPE DHT11
+#define DHTPINON 4
 
 #define analogInPin  A0
 #define resistor1  1008
@@ -36,6 +37,8 @@ float denominator;
 #define LPP_HUMIDITY 104
 #define LPP_ANALOG_INPUT 2
 
+float temperature = 0;
+float humidity = 0;
 
 
 const lmic_pinmap lmic_pins = {
@@ -45,38 +48,58 @@ const lmic_pinmap lmic_pins = {
   .dio = {2, 6, 7},
 };
 
+int16_t val;
+uint8_t cursor = 0;
+byte buffer[11];
+
 DHT dht(DHTPIN, DHTTYPE);
+
+void resetLora(){
+  LMIC_reset();
+
+
+  uint8_t appskey[sizeof(APPSKEY)];
+  uint8_t nwkskey[sizeof(NWKSKEY)];
+  memcpy_P(appskey, APPSKEY, sizeof(APPSKEY));
+  memcpy_P(nwkskey, NWKSKEY, sizeof(NWKSKEY));
+  LMIC_setSession (0x1, DEVADDR, nwkskey, appskey);
+
+
+  LMIC_selectSubBand(1);
+
+  LMIC_setLinkCheckMode(0);
+
+  LMIC_setDrTxpow(DR_SF10,14);
+
+}
 
 
 void do_send(osjob_t* j) {
 
-  int16_t val;
+  resetLora();
 
-  byte buffer[11];
-  uint8_t cursor = 0;
+  val = 0;
+  cursor = 0;
 
-  float temperature = 0;
-  if(temperature==0 || isnan(temperature)){
-    delay(2000);
-    temperature = dht.readTemperature();
-  }
+  //Liga pino do dht22
+  digitalWrite(DHTPINON, HIGH);
+  delay(2000);
+  temperature = dht.readTemperature();
 
-  float humidity = 0;
-  if(humidity==0 || isnan(humidity)){
-    delay(2000);
-    humidity = dht.readHumidity();
-  }
+  delay(2000);
+  humidity = dht.readHumidity();
+
+  digitalWrite(DHTPINON, LOW);
 
   // read the analog in value:
 
-  denominator = (float)resistor2 / (resistor1 + resistor2);
-
   sensorValue = 0;
-  for(int i = 0; i <500;i++){
+  for(int i = 0; i <50;i++){
     sensorValue += analogRead(analogInPin);
-    delay(1);
+    delay(10);
   }
-  sensorValue = sensorValue/500;
+  sensorValue = sensorValue/50;
+  Serial.println(sensorValue);
 
   float voltage = sensorValue* 5.0  / 1023  ;
   voltage = voltage / denominator;
@@ -198,26 +221,20 @@ void setup() {
   Serial.begin(115200);
   Serial.println(F("Starting"));
 
+  pinMode(DHTPINON, OUTPUT);
+  digitalWrite(DHTPINON, HIGH);
+  delay(2000);
+  dht.begin();
+
+  denominator = (float)resistor2 / (resistor1 + resistor2);
 
   os_init();
-  LMIC_reset();
-  LMIC_setClockError(MAX_CLOCK_ERROR * 1 / 100);
 
+  os_init();
 
-  uint8_t appskey[sizeof(APPSKEY)];
-  uint8_t nwkskey[sizeof(NWKSKEY)];
-  memcpy_P(appskey, APPSKEY, sizeof(APPSKEY));
-  memcpy_P(nwkskey, NWKSKEY, sizeof(NWKSKEY));
-  LMIC_setSession (0x1, DEVADDR, nwkskey, appskey);
-
-
-  LMIC_selectSubBand(0);
-
-  LMIC_setLinkCheckMode(0);
-  LMIC_setDrTxpow(DR_SF9,14);
+  resetLora();
 
   do_send(&sendjob);
-
 
 }
 

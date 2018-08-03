@@ -70,11 +70,12 @@ void resetLora(){
   LMIC_setSession (0x1, DEVADDR, nwkskey, appskey);
 
 
-  LMIC_selectSubBand(0);
+  LMIC_selectSubBand(1);
 
-  LMIC_setLinkCheckMode(0);
-
-  LMIC_setDrTxpow(DR_SF9,14);
+  //LMIC_setLinkCheckMode(0);
+  //LMIC_setAdrMode(0);
+  LMIC_setDrTxpow(DR_SF10,14);
+  LMIC.dn2Dr = DR_SF10;
 
 }
 
