@@ -4,9 +4,8 @@
 #include <hal/hal.h>
 #include <SPI.h>
 #include <Wire.h>
-#include <Adafruit_ADS1015.h>
 #include "DHTesp.h"
-
+#include "AlphaSense.h"
 #include "config.h"
 
 void os_getArtEui (u1_t* buf) { }
@@ -19,7 +18,7 @@ char TTN_response[3];
 int16_t val;
 uint8_t cursor = 0;
 byte buffer[19];
-#define TX_INTERVAL  30
+#define TX_INTERVAL  600
 
 // Pin mapping
 const lmic_pinmap lmic_pins = {
@@ -32,25 +31,20 @@ const lmic_pinmap lmic_pins = {
 #define DHTPIN 8
 DHTesp dht;
 
-float temperature = 0;
-float humidity = 0;
-
 #define LPP_TEMPERATURE 103
 #define LPP_HUMIDITY 104
 #define LPP_ANALOG_INPUT 2
 
 
-Adafruit_ADS1115  adsCO(0x48);
-Adafruit_ADS1115  adsSO2(0x49);
-Adafruit_ADS1115   adsNO(0x4A);
-float multiplier = 0.1875F;
+AlphaSense sensorCO("CO",162470430, 332, 294, 345, 344, 0.470);
+AlphaSense sensorSO2("SO2",164470002, 335, 362, 360, 368, 0.332);
+AlphaSense sensorNO2("NO2",202501663, 230, 214, 229, 214, 0.228);
 
-float dif1=0 ;
-float dif2 =0;
-
-float co;
+float temperature = 0;
+float humidity = 0;
+float CO;
 float SO2;
-float NO;
+float NO2;
 
 
 void leSensores(){
@@ -66,94 +60,15 @@ void leSensores(){
   Serial.println(temperature);
 
 
-  dif1=0 ;
-  dif2 =0;
+  sensorCO.readValue(10,100);
+  CO = sensorCO.algorithm_simple();
 
-  int mvWe;
-  int mvAe;
+  sensorSO2.readValue(10,100);
+  SO2 = sensorSO2.algorithm_simple();
 
-  int i = 0;
-  for(i = 0 ; i < 10; i++){
-    dif1 += adsCO.readADC_Differential_0_1();
-    dif2 += adsCO.readADC_Differential_2_3();
-    delay(200);
-  }
+  sensorNO2.readValue(10,100);
+  NO2 = sensorNO2.algorithm_simple();
 
-  dif1 = dif1/10;
-  dif2 = dif2/10;
-
-  Serial.print("dif = ");
-  Serial.print(dif1);
-  Serial.print("dif2 = ");
-  Serial.println(dif2);
-
-  mvWe = dif1 * multiplier;
-  mvAe = dif2 * multiplier;
-  co = (mvWe+mvAe)/2/470.0;
-
-  Serial.print("CO: WE ");
-  Serial.print(mvWe);
-  Serial.print(";AE ");
-  Serial.print(mvAe);
-  Serial.print(";CO ");
-  Serial.println(co);
-
-  dif1 =0;
-  dif2 =0;
-  i = 0;
-  for(i = 0 ; i < 10; i++){
-    dif1 += adsSO2.readADC_Differential_0_1();
-    dif2 += adsSO2.readADC_Differential_2_3();
-    delay(200);
-  }
-
-  dif1 = dif1/10;
-  dif2 = dif2/10;
-
-  Serial.print("dif = ");
-  Serial.print(dif1);
-  Serial.print(" dif2 = ");
-  Serial.println(dif2);
-
-  mvWe = dif1 * multiplier;
-  mvAe = dif2 * multiplier;
-  SO2 = (mvWe+mvAe)/2/332.0;
-
-  Serial.print("SO2: WE ");
-  Serial.print(mvWe);
-  Serial.print(";AE ");
-  Serial.print(mvAe);
-  Serial.print(";SO2 ");
-  Serial.println(SO2);
-
-
-  dif1 =0;
-  dif2 =0;
-  i = 0;
-  for(i = 0 ; i < 10; i++){
-    dif1 += adsNO.readADC_Differential_0_1();
-    dif2 += adsNO.readADC_Differential_2_3();
-    delay(200);
-  }
-
-  dif1 = dif1/10;
-  dif2 = dif2/10;
-
-  Serial.print("dif = ");
-  Serial.print(dif1);
-  Serial.print(" dif2 = ");
-  Serial.println(dif2);
-
-  mvWe = dif1 * multiplier;
-  mvAe = dif2 * multiplier;
-  NO = (mvWe+mvAe)/2/228.0;
-
-  Serial.print("NO: WE ");
-  Serial.print(mvWe);
-  Serial.print(";AE ");
-  Serial.print(mvAe);
-  Serial.print(";NO ");
-  Serial.println(NO);
 }
 
 void resetLora(){
@@ -199,19 +114,19 @@ void do_send(osjob_t* j) {
   buffer[cursor++] = LPP_HUMIDITY;
   buffer[cursor++] = val;
 
-  val = float(co*100);
+  val = float(CO*100/1000);
   buffer[cursor++] = 0x03;
   buffer[cursor++] = LPP_ANALOG_INPUT;
   buffer[cursor++] = val >> 8;
   buffer[cursor++] = val;
 
-  val = float(SO2*100);
+  val = float(SO2*100/1000);
   buffer[cursor++] = 0x04;
   buffer[cursor++] = LPP_ANALOG_INPUT;
   buffer[cursor++] = val >> 8;
   buffer[cursor++] = val;
 
-  val = float(NO*100);
+  val = float(NO2*100);
   buffer[cursor++] = 0x05;
   buffer[cursor++] = LPP_ANALOG_INPUT;
   buffer[cursor++] = val >> 8;
@@ -315,13 +230,10 @@ void setup() {
 
   Serial.println(F("Starting..."));
 
-  adsCO.setGain(GAIN_TWOTHIRDS);
-  adsSO2.setGain(GAIN_TWOTHIRDS);
-  adsNO.setGain(GAIN_TWOTHIRDS);
+  sensorCO.init(0x48);
+  sensorSO2.init(0x49);
+  sensorNO2.init(0x4A);
 
-  adsCO.begin();
-  adsSO2.begin();
-  adsNO.begin();
 
 
   dht.setup(DHTPIN,DHTesp::DHT22);
