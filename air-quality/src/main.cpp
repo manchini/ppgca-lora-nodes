@@ -28,7 +28,7 @@ const lmic_pinmap lmic_pins = {
   .dio = {2, 4, 16},
 };
 
-#define DHTPIN 8
+#define DHTPIN 25
 DHTesp dht;
 
 #define LPP_TEMPERATURE 103
@@ -36,15 +36,22 @@ DHTesp dht;
 #define LPP_ANALOG_INPUT 2
 
 
+/* caixa 1*/
+/*AlphaSense sensorCO("CO",162470429, 344, 312, 341, 336, 0.442);
+AlphaSense sensorSO2("SO2",164470003, 342, 368, 343, 350, 0.318);
+AlphaSense sensorNO2("NO2",202501662, 238, 217, 229, 231, 0.215);*/
+
+/* caixa 2*/
 AlphaSense sensorCO("CO",162470430, 332, 294, 345, 344, 0.470);
 AlphaSense sensorSO2("SO2",164470002, 335, 362, 360, 368, 0.332);
 AlphaSense sensorNO2("NO2",202501663, 230, 214, 229, 214, 0.228);
 
+
 float temperature = 0;
 float humidity = 0;
-float CO;
-float SO2;
-float NO2;
+int CO;
+int SO2;
+int NO2;
 
 
 void leSensores(){
@@ -60,13 +67,13 @@ void leSensores(){
   Serial.println(temperature);
 
 
-  sensorCO.readValue(10,100);
+  sensorCO.readValue(5,200);
   CO = sensorCO.algorithm_simple();
 
-  sensorSO2.readValue(10,100);
+  sensorSO2.readValue(5,200);
   SO2 = sensorSO2.algorithm_simple();
 
-  sensorNO2.readValue(10,100);
+  sensorNO2.readValue(5,200);
   NO2 = sensorNO2.algorithm_simple();
 
 }
@@ -114,19 +121,19 @@ void do_send(osjob_t* j) {
   buffer[cursor++] = LPP_HUMIDITY;
   buffer[cursor++] = val;
 
-  val = float(CO*100/1000);
+  val = float(CO);
   buffer[cursor++] = 0x03;
   buffer[cursor++] = LPP_ANALOG_INPUT;
   buffer[cursor++] = val >> 8;
   buffer[cursor++] = val;
 
-  val = float(SO2*100/1000);
+  val = float(SO2);
   buffer[cursor++] = 0x04;
   buffer[cursor++] = LPP_ANALOG_INPUT;
   buffer[cursor++] = val >> 8;
   buffer[cursor++] = val;
 
-  val = float(NO2*100);
+  val = float(NO2);
   buffer[cursor++] = 0x05;
   buffer[cursor++] = LPP_ANALOG_INPUT;
   buffer[cursor++] = val >> 8;
@@ -234,7 +241,7 @@ void setup() {
   sensorSO2.init(0x49);
   sensorNO2.init(0x4A);
 
-
+  //delay(30000);
 
   dht.setup(DHTPIN,DHTesp::DHT22);
 
@@ -247,6 +254,8 @@ void setup() {
 }
 
 void loop() {
-  os_runloop_once();
+//  os_runloop_once();
+
+  leSensores();
 
 }

@@ -57,8 +57,14 @@ void AlphaSense::readValue(int repeat, unsigned long _delay){
   dif1 = dif1/repeat;
   dif2 = dif2/repeat;
 
+
   we_value = dif1 * ads_multiplier;
   ae_value = dif2 * ads_multiplier;
+
+  /*Serial.print(";we:");
+  Serial.print(we_value);
+  Serial.print(";ae:");
+  Serial.println(ae_value);*/
 }
 
 float AlphaSense::getWe(){

@@ -1,6 +1,8 @@
 #include <Arduino.h>
 #include <Adafruit_ADS1015.h>
 
+
+
 class AlphaSense
 {
 public:
